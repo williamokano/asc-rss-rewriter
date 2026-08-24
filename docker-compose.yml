@@ -14,10 +14,10 @@ services:
     ports:
       - 7474:7474
     depends_on:
-      - asc-rss-proxy
+      - rewriter
 
-  asc-rss-proxy:
-    container_name: asc-rss-proxy
+  rewriter:
+    container_name: rewriter
     image: ghcr.io/williamokano/asc-rss-rewriter:latest
     restart: unless-stopped
     environment:
