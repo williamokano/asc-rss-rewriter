@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"regexp"
@@ -17,7 +18,6 @@ import (
 var re = regexp.MustCompile(`(?i)<link>(https?://[^<]*torrents-details\.php\?id=([0-9]+)[^<]*)</link>`)
 
 func fixInvalidXML(body string) string {
-	// Finds valid entities like &amp;, &lt;, etc., OR a standalone &
 	reAmp := regexp.MustCompile(`&[a-zA-Z0-9#]+;|&`)
 	return reAmp.ReplaceAllStringFunc(body, func(m string) string {
 		if strings.HasSuffix(m, ";") {
@@ -27,16 +27,16 @@ func fixInvalidXML(body string) string {
 	})
 }
 
-func rewriteRSS(body string) string {
-	// 1. Fix the invalid XML (unescaped ampersands)
+// rewriteRSS rewrites links to point back to the proxy itself (proxyHost)
+func rewriteRSS(body string, proxyHost string) string {
 	compliantBody := fixInvalidXML(body)
 
-	// 2. Rewrite the links and append the enclosures
 	return re.ReplaceAllStringFunc(compliantBody, func(match string) string {
 		submatches := re.FindStringSubmatch(match)
 		if len(submatches) == 3 {
 			id := submatches[2]
-			newURL := fmt.Sprintf("https://cliente.amigos-share.club/download.php?id=%s", id)
+			// Point the download back to our proxy
+			newURL := fmt.Sprintf("http://%s/download.php?id=%s", proxyHost, id)
 			return fmt.Sprintf("<link>%s</link>\n<enclosure url=\"%s\" type=\"application/x-bittorrent\"/>", newURL, newURL)
 		}
 		return match
@@ -49,15 +49,66 @@ func main() {
 		log.Fatal("RSS_URL environment variable is required")
 	}
 
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		log.Fatalf("Invalid RSS_URL: %v", err)
+	}
+	targetBaseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+
+	cookie := os.Getenv("COOKIE")
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok\n"))
+	})
+
+	// Intercept /download.php to proxy the torrent download
+	mux.HandleFunc("/download.php", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "Missing id parameter", http.StatusBadRequest)
+			return
+		}
+
+		downloadURL := fmt.Sprintf("%s/download.php?id=%s", targetBaseURL, id)
+		req, err := http.NewRequestWithContext(r.Context(), "GET", downloadURL, nil)
+		if err != nil {
+			http.Error(w, "Failed to create request: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if cookie != "" {
+			req.Header.Set("Cookie", cookie)
+		}
+
+		// Copy useful headers from the original request (like User-Agent)
+		req.Header.Set("User-Agent", r.Header.Get("User-Agent"))
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			http.Error(w, "Failed to download torrent: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Copy response headers (like Content-Disposition, Content-Type)
+		for k, vv := range resp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			log.Printf("Error copying torrent body: %v", err)
+		}
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +125,8 @@ func main() {
 			return
 		}
 
-		rewritten := rewriteRSS(string(bodyBytes))
+		// Rewrite using the Host header so it points back to this proxy instance
+		rewritten := rewriteRSS(string(bodyBytes), r.Host)
 
 		w.Header().Set("Content-Type", "application/rss+xml; charset=utf-8")
 		w.WriteHeader(resp.StatusCode)
@@ -92,7 +144,14 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Starting RSS rewriter on :%s, targeting %s", port, targetURL)
+		log.Printf("Starting RSS rewriter on :%s", port)
+		log.Printf("Targeting RSS Base: %s", targetBaseURL)
+		if cookie != "" {
+			log.Printf("Cookie auth enabled for torrent downloads")
+		} else {
+			log.Printf("WARNING: No COOKIE set! Downloads may fail if authentication is required.")
+		}
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}

@@ -42,7 +42,7 @@ func TestRewriteRSS(t *testing.T) {
 </channel>
 </rss>`
 
-	output := rewriteRSS(input)
+	output := rewriteRSS(input, "rewriter:8080")
 
 	// We expect the original channel link to remain unchanged
 	if !strings.Contains(output, "<link>https://cliente.amigos-share.club</link>") {
@@ -50,25 +50,25 @@ func TestRewriteRSS(t *testing.T) {
 	}
 
 	// We expect the 1st item link to be rewritten
-	expectedItem1Link := `<link>https://cliente.amigos-share.club/download.php?id=179278</link>`
+	expectedItem1Link := `<link>http://rewriter:8080/download.php?id=179278</link>`
 	if !strings.Contains(output, expectedItem1Link) {
 		t.Errorf("Expected output to contain %s, but it didn't", expectedItem1Link)
 	}
 
 	// We expect the 1st item to have an enclosure tag
-	expectedItem1Enclosure := `<enclosure url="https://cliente.amigos-share.club/download.php?id=179278" type="application/x-bittorrent"/>`
+	expectedItem1Enclosure := `<enclosure url="http://rewriter:8080/download.php?id=179278" type="application/x-bittorrent"/>`
 	if !strings.Contains(output, expectedItem1Enclosure) {
 		t.Errorf("Expected output to contain %s, but it didn't", expectedItem1Enclosure)
 	}
 
 	// We expect the 2nd item link to be rewritten
-	expectedItem2Link := `<link>https://cliente.amigos-share.club/download.php?id=179275</link>`
+	expectedItem2Link := `<link>http://rewriter:8080/download.php?id=179275</link>`
 	if !strings.Contains(output, expectedItem2Link) {
 		t.Errorf("Expected output to contain %s, but it didn't", expectedItem2Link)
 	}
 
 	// We expect the 3rd item link to be rewritten
-	expectedItem3Link := `<link>https://cliente.amigos-share.club/download.php?id=179274</link>`
+	expectedItem3Link := `<link>http://rewriter:8080/download.php?id=179274</link>`
 	if !strings.Contains(output, expectedItem3Link) {
 		t.Errorf("Expected output to contain %s, but it didn't", expectedItem3Link)
 	}

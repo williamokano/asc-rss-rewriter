@@ -25,7 +25,8 @@ This project is automatically built and published as a tiny multi-arch Alpine im
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -e RSS_URL="https://cliente.amigos-share.club/rss.php?cat=69,116,118,119,120,64,62,63&passkey=YOUR_PASSKEY_HERE" \
+  -e RSS_URL="https://cliente.amigos-share.club/rss.php?cat=69...&passkey=YOUR_PASSKEY_HERE" \
+  -e COOKIE="uid=12345; pass=abcdef..." \
   --name asc-rss-rewriter \
   ghcr.io/williamokano/asc-rss-rewriter:latest
 ```
@@ -44,6 +45,9 @@ go build -o rewriter main.go
 
 # Export your target RSS feed URL
 export RSS_URL="https://cliente.amigos-share.club/rss.php?cat=69...&passkey=YOUR_PASSKEY"
+
+# Export your cookie so the proxy can download the .torrent files on behalf of your client
+export COOKIE="uid=12345; pass=abcdef..."
 
 # Optional: Change the listening port (defaults to 8080)
 export PORT=8080

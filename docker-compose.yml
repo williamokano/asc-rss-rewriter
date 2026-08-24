@@ -23,5 +23,7 @@ services:
     environment:
       # Replace YOUR_PASSKEY_HERE with your real passkey
       - RSS_URL=https://cliente.amigos-share.club/rss.php?cat=69,116,118,119,120,64,62,63&passkey=YOUR_PASSKEY_HERE
+      # Provide your login cookie here (e.g. uid=...; pass=...) to allow proxying torrent downloads
+      - COOKIE=uid=YOUR_UID; pass=YOUR_PASS
     # Notice no 'ports' block here! It's not exposed to your host machine.
     # Autobrr will communicate with it internally via the Docker network.
