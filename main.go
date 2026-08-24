@@ -69,10 +69,25 @@ func main() {
 		w.Write([]byte("ok\n"))
 	})
 
+	// Client used for torrent downloads; logs every hop so redirects to a
+	// login page (e.g. an expired/invalid cookie) are visible instead of
+	// being silently followed.
+	downloadClient := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			log.Printf("[download] redirect: %s -> %s", via[len(via)-1].URL, req.URL)
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return nil
+		},
+	}
+
 	// Intercept /download.php to proxy the torrent download
 	mux.HandleFunc("/download.php", func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
+		log.Printf("[download] received request: id=%s remote=%s ua=%q", id, r.RemoteAddr, r.Header.Get("User-Agent"))
 		if id == "" {
+			log.Printf("[download] rejected: missing id parameter")
 			http.Error(w, "Missing id parameter", http.StatusBadRequest)
 			return
 		}
@@ -80,6 +95,7 @@ func main() {
 		downloadURL := fmt.Sprintf("%s/download.php?id=%s", targetBaseURL, id)
 		req, err := http.NewRequestWithContext(r.Context(), "GET", downloadURL, nil)
 		if err != nil {
+			log.Printf("[download] id=%s failed to build upstream request: %v", id, err)
 			http.Error(w, "Failed to create request: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -91,12 +107,17 @@ func main() {
 		// Copy useful headers from the original request (like User-Agent)
 		req.Header.Set("User-Agent", r.Header.Get("User-Agent"))
 
-		resp, err := http.DefaultClient.Do(req)
+		log.Printf("[download] id=%s proxying to upstream: %s (cookie set=%t)", id, downloadURL, cookie != "")
+		resp, err := downloadClient.Do(req)
 		if err != nil {
+			log.Printf("[download] id=%s upstream request failed: %v", id, err)
 			http.Error(w, "Failed to download torrent: "+err.Error(), http.StatusBadGateway)
 			return
 		}
 		defer resp.Body.Close()
+
+		log.Printf("[download] id=%s upstream response: status=%d final_url=%s content-type=%q content-length=%s",
+			id, resp.StatusCode, resp.Request.URL, resp.Header.Get("Content-Type"), resp.Header.Get("Content-Length"))
 
 		// Copy response headers (like Content-Disposition, Content-Type)
 		for k, vv := range resp.Header {
@@ -106,9 +127,12 @@ func main() {
 		}
 		w.WriteHeader(resp.StatusCode)
 
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			log.Printf("Error copying torrent body: %v", err)
+		written, err := io.Copy(w, resp.Body)
+		if err != nil {
+			log.Printf("[download] id=%s error copying torrent body: %v", id, err)
+			return
 		}
+		log.Printf("[download] id=%s returned to client: status=%d bytes=%d", id, resp.StatusCode, written)
 	})
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
