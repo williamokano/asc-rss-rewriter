@@ -32,9 +32,23 @@ docker run -d \
   ghcr.io/williamokano/asc-rss-rewriter:latest
 ```
 
-*(The image includes a built-in Docker `HEALTHCHECK` mapped to the `/healthz` endpoint for automated orchestration restarts!)*
+### Option 2: Go Install (Native)
 
-### Option 2: Build from Source (Go 🐹)
+If you have Go installed, you can simply install the proxy globally on your system:
+
+```bash
+go install github.com/williamokano/asc-rss-rewriter@latest
+```
+
+This will place the `asc-rss-rewriter` binary in your `$GOPATH/bin` directory.
+
+### Option 3: GitHub Releases (Pre-compiled Binaries)
+
+Don't want to build it yourself? No problem! 
+
+Head over to the [Releases](https://github.com/williamokano/asc-rss-rewriter/releases) page to download pre-compiled binaries for **Windows, macOS, and Linux** (both `amd64` and `arm64`). This is powered automatically by GoReleaser.
+
+### Option 4: Build from Source (Go 🐹)
 
 ```bash
 # Clone the repository
@@ -43,7 +57,13 @@ cd asc-rss-rewriter
 
 # Build the binary
 go build -o rewriter main.go
+```
 
+### Starting the Native Proxy
+
+If you chose Options 2, 3, or 4, you can run the binary directly in your terminal:
+
+```bash
 # Export your target RSS feed URL
 export RSS_URL="https://cliente.amigos-share.club/rss.php?cat=69...&passkey=YOUR_PASSKEY"
 
