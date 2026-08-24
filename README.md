@@ -11,8 +11,9 @@ Some BitTorrent RSS feeds (like Amigos Share Club) output links pointing to web 
 
 **ASC RSS Rewriter acts as a middleman:**
 1. **Fixes XML Syntax:** Scans the entire feed and smartly escapes invalid standalone ampersands (`&` → `&amp;`) without destroying existing entities, rendering the feed 100% compliant.
-2. **Rewrites Links:** Detects item detail links and rewrites them into direct `download.php` links.
+2. **Rewrites Links:** Detects item detail links and rewrites them to point back to the proxy itself.
 3. **Injects Enclosures:** Automatically injects the correct BitTorrent `<enclosure>` tags so your torrent client (qBittorrent, Deluge, etc.) recognizes them immediately.
+4. **Proxies Authenticated Downloads:** Intercepts requests to download the `.torrent` files and uses your provided `COOKIE` to fetch them securely on behalf of your Torrent client.
 
 ---
 
@@ -69,6 +70,20 @@ http://localhost:8080/
 ### Endpoints
 * `/` - Proxies and rewrites the RSS feed.
 * `/healthz` - Liveness probe, returns `HTTP 200 ok`.
+
+---
+
+## 🔑 Authentication Setup (Cookies)
+
+If your tracker requires a login session to download `.torrent` files (meaning `passkey` inside the URL is not permitted for downloads), you must provide your login cookie to the proxy.
+
+1. Log in to your torrent tracker using your browser.
+2. Open Developer Tools (F12) > Application / Storage > Cookies.
+3. Find your session cookies (e.g. `PHPSESSID`, `uid`, `pass`).
+4. Set them in the `COOKIE` environment variable, separated by semicolons:
+   `COOKIE="PHPSESSID=xxx; pass=yyy; uid=zzz"`
+
+When your Torrent client requests the file from the proxy, the proxy will inject these cookies into its own request and seamlessly hand the `.torrent` file back to you!
 
 ---
 
