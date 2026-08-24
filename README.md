@@ -73,6 +73,11 @@ export COOKIE="uid=12345; pass=abcdef..."
 # Optional: Change the listening port (defaults to 8080)
 export PORT=8080
 
+# Optional: Set the log verbosity - DEBUG, INFO, WARN, ERROR (defaults to INFO)
+# DEBUG also logs a preview of the raw response body for every download,
+# which is useful for diagnosing failed/rejected downloads.
+export LOG_LEVEL=INFO
+
 # Run it!
 ./rewriter
 ```
