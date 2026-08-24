@@ -1,0 +1,27 @@
+version: "3.7"
+
+services:
+  autobrr:
+    container_name: autobrr
+    image: ghcr.io/autobrr/autobrr:latest
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+    user: 1000:1000
+    volumes:
+      # Changed from /volume2/docker_configs to a local relative folder
+      - ./autobrr-data:/config
+    ports:
+      - 7474:7474
+    depends_on:
+      - asc-rss-proxy
+
+  asc-rss-proxy:
+    container_name: asc-rss-proxy
+    image: ghcr.io/williamokano/asc-rss-rewriter:latest
+    restart: unless-stopped
+    environment:
+      # Replace YOUR_PASSKEY_HERE with your real passkey
+      - RSS_URL=https://cliente.amigos-share.club/rss.php?cat=69,116,118,119,120,64,62,63&passkey=YOUR_PASSKEY_HERE
+    # Notice no 'ports' block here! It's not exposed to your host machine.
+    # Autobrr will communicate with it internally via the Docker network.
